@@ -107,7 +107,6 @@
 
         .screen-content { text-align: center; width: 100%; }
 
-        /* 結算佈局調整 */
         .result-container {
             display: flex; width: 92%; height: 92%; 
             gap: 20px; margin: auto;
@@ -123,7 +122,6 @@
         h2 { margin: 0 0 10px 0; font-size: 2.2vw; text-transform: uppercase; }
         .big-score { font-size: 8vw; font-weight: 900; margin: auto; }
         
-        /* 排行榜列表優化 */
         .leaderboard-list {
             width: 100%; text-align: left; 
             font-size: 1.0vw; 
@@ -208,8 +206,8 @@
                 P1: <b>WASD</b> &nbsp;|&nbsp; P2: <b>方向鍵</b>
             </p>
             <p style="color:#ffcc00; font-size: 1.3vw; background: rgba(0,0,0,0.5); display:inline-block; padding:10px 20px; border-radius:20px;">
-                ⭐ 撞球模式：有向數、方程、指數 (撞對得分)<br>
-                ⭐ 生存模式：畢氏定理、不等式、幾何 (搶地盤)
+                ⭐ 撞球模式：加減、乘除、數列 (撞對得分/撞錯扣分)<br>
+                ⭐ 生存模式：倍數、角度、時鐘 (5秒搶地盤)
             </p>
             <br>
             <button id="start-btn">開始對戰 (按 Space)</button>
@@ -284,10 +282,8 @@
 
         // --- 遊戲參數 ---
         let gameState = 'start'; 
-        let gameTime = 60; 
+        let gameTime = 60; // 60秒
         let timerInterval = null;
-        let specialEventTriggered = false; // 已移除特別題邏輯，保留變數防止報錯
-        let continuousScoreTimer = 0;
 
         let currentMode = 'bumper'; 
         let survivalTargetTime = 0; 
@@ -328,9 +324,9 @@
         }
 
         let gamepadBtnPressed = { p1: false, p2: false };
-        let targets = [];
+        let targets =[];
         let particles = [];
-        let floatingTexts = [];
+        let floatingTexts =[];
         let shakeFrames = 0;
 
         function startGame() {
@@ -342,8 +338,7 @@
             players.p1.vx = 0; players.p1.vy = 0;
             players.p2.vx = 0; players.p2.vy = 0;
             
-            gameTime = 60; 
-            specialEventTriggered = false;
+            gameTime = 60; // 60秒
             questionCounter = 0;
             lastBumperType = '';
             questionHistory.clear();
@@ -377,7 +372,7 @@
             questionCounter++;
             let isSurvivalTurn = (questionCounter % 3 === 0);
             if (isSurvivalTurn) {
-                setSurvivalMode(false);
+                setSurvivalMode();
                 generateSurvivalQuestion();
             } else {
                 setBumperMode();
@@ -390,69 +385,53 @@
             ui.qContainer.classList.add('bumper-mode-q');
         }
 
-        function setSurvivalMode(isSpecial) {
+        function setSurvivalMode() {
             currentMode = 'survival';
             ui.qContainer.classList.remove('bumper-mode-q');
             targets = []; 
         }
 
         function generateBumperQuestion() {
-            // 初中基礎運算 (Bumper)
-            let types = ['directed', 'algebra', 'power']; 
+            let types =['add_sub', 'mul_div', 'series', 'mul_div', 'series']; 
             let type, qStr, ans, qID;
             let attempts = 0;
             do {
                 attempts++;
                 do { type = types[Math.floor(Math.random() * types.length)]; } while (type === lastBumperType);
                 
-                if (type === 'directed') {
-                    // 有向數加減 (e.g. -3 + 5)
-                    let a = Math.floor(Math.random()*9) + 1; // 1-9
-                    let b = Math.floor(Math.random()*9) + 1;
-                    if(Math.random() < 0.5) a = -a; // a 可能是負數
-                    let sign = Math.random() < 0.5 ? '+' : '-';
-                    qStr = `${a} ${sign} ${b} = ?`;
-                    ans = (sign==='+') ? a+b : a-b;
-                    qID = `dir_${a}_${sign}_${b}`;
-                } else if (type === 'algebra') {
-                    // 簡易方程 (e.g. 2x = 10, x + 3 = 8)
-                    let sub = Math.random();
-                    if (sub < 0.5) {
-                        // ax = b
-                        let x = Math.floor(Math.random()*9) + 2; // 答案
-                        let coef = Math.floor(Math.random()*4) + 2; // 係數 2-5
-                        let res = x * coef;
-                        qStr = `解方程: ${coef}x = ${res}`;
-                        ans = x;
-                        qID = `alg_mul_${coef}_${res}`;
+                if (type === 'add_sub') {
+                    // 難度：20以內
+                    let op = Math.random() < 0.5 ? '+' : '-';
+                    let a = Math.floor(Math.random()*15)+5; // 5-20
+                    let b = Math.floor(Math.random()*10)+1; // 1-10
+                    if(op==='-') a += b; 
+                    qStr = `${a} ${op} ${b} = ?`;
+                    ans = (op==='+') ? a+b : a-b;
+                    qID = `bum_${op}_${a}_${b}`;
+                } else if (type === 'mul_div') {
+                    let op = Math.random() < 0.5 ? 'x' : '÷';
+                    if(op==='x') {
+                        // 難度：9x9
+                        let a = Math.floor(Math.random()*8)+2; // 2-9
+                        let b = Math.floor(Math.random()*8)+2; 
+                        qStr = `${a} × ${b} = ?`;
+                        ans = a*b;
+                        qID = `bum_x_${a}_${b}`;
                     } else {
-                        // x + a = b
-                        let x = Math.floor(Math.random()*15) - 5; // 答案
-                        let a = Math.floor(Math.random()*10) + 1;
-                        let res = x + a;
-                        let sign = a < 0 ? '-' : '+';
-                        qStr = `解方程: x ${sign} ${Math.abs(a)} = ${res}`;
-                        ans = x;
-                        qID = `alg_add_${a}_${res}`;
+                        // 難度：九九乘法內的除法
+                        let b = Math.floor(Math.random()*8)+2; 
+                        let a = b * (Math.floor(Math.random()*8)+2);
+                        qStr = `${a} ÷ ${b} = ?`;
+                        ans = a/b;
+                        qID = `bum_div_${a}_${b}`;
                     }
-                } else if (type === 'power') {
-                    // 指數與平方根
-                    let sub = Math.random();
-                    if (sub < 0.4) {
-                        // 簡單平方/立方: 2^3, 3^2, 5^2
-                        let base = Math.floor(Math.random()*5) + 2; 
-                        let exp = base > 3 ? 2 : Math.floor(Math.random()*2)+2; // 2 or 3
-                        qStr = `${base} 的 ${exp} 次方 = ?`;
-                        ans = Math.pow(base, exp);
-                        qID = `pow_${base}_${exp}`;
-                    } else {
-                        // 平方根: sqrt(16), sqrt(36)
-                        let root = Math.floor(Math.random()*9) + 2; // 2-10
-                        let sq = root * root;
-                        qStr = `√${sq} = ?`;
-                        ans = root;
-                        qID = `sqrt_${sq}`;
-                    }
+                } else if (type === 'series') {
+                    // 難度：簡單等差數列
+                    let start = Math.floor(Math.random()*20)+1;
+                    let diff = Math.floor(Math.random()*5)+2;
+                    qStr = `${start}, ${start+diff}, ${start+diff*2}, ?`;
+                    ans = start + diff*3;
+                    qID = `bum_seq_${start}_${diff}`;
                 }
             } while (questionHistory.has(qID) && attempts < 10);
             questionHistory.add(qID);
@@ -462,49 +441,28 @@
         }
 
         function generateSurvivalQuestion() {
-            // 初中基礎概念 (Survival)
-            let types = ['pythagoras', 'inequality', 'angle'];
+            let types = ['multiple', 'angle', 'time'];
             let type = types[Math.floor(Math.random()*types.length)];
-            let qStr = "", opts = [], qID;
+            let qStr = "", opts =[], qID;
             let attempts = 0;
             do {
                 attempts++;
-                if (type === 'pythagoras') {
-                    // 畢氏定理 (勾股數)
-                    // 3-4-5, 5-12-13, 6-8-10
-                    let triples = [[3,4,5], [5,12,13], [6,8,10], [8,15,17]];
-                    let t = triples[Math.floor(Math.random() * triples.length)];
-                    qStr = `直角三角形邊長: ${t[0]}, ${t[1]}, ?`;
-                    let ans = t[2];
-                    
-                    let w1 = ans + 1;
-                    let w2 = ans - 1;
-                    let w3 = ans + 2;
-                    opts = [{val:ans, isCorrect:true, type:'text'}, {val:w1, isCorrect:false, type:'text'}, {val:w2, isCorrect:false, type:'text'}, {val:w3, isCorrect:false, type:'text'}];
-                    qID = `pyth_${t[0]}`;
-
-                } else if (type === 'inequality') {
-                    // 不等式
-                    let x = Math.floor(Math.random()*10);
-                    let isGreater = Math.random() < 0.5;
-                    qStr = isGreater ? `x > ${x} 的整數` : `x < ${x} 的整數`;
-                    let correct = isGreater ? x + Math.floor(Math.random()*5)+1 : x - Math.floor(Math.random()*5)-1;
-                    
-                    let w1, w2, w3;
-                    if(isGreater) {
-                        w1 = x; w2 = x - 1; w3 = x - 5;
-                    } else {
-                        w1 = x; w2 = x + 1; w3 = x + 5;
-                    }
-                    opts = [{val:correct, isCorrect:true, type:'text'}, {val:w1, isCorrect:false, type:'text'}, {val:w2, isCorrect:false, type:'text'}, {val:w3, isCorrect:false, type:'text'}];
-                    qID = `ineq_${x}_${isGreater}`;
-
+                if (type === 'multiple') {
+                    let base = Math.floor(Math.random()*5)+3; // 3-7 的倍數
+                    let correct = base * (Math.floor(Math.random()*5)+2);
+                    qID = `sur_mul_${base}_${correct}`;
+                    qStr = `找出 ${base} 的倍數`;
+                    let w1 = generateNonMultiple(base);
+                    let w2 = generateNonMultiple(base);
+                    let w3 = generateNonMultiple(base);
+                    while(w2 === w1) w2 = generateNonMultiple(base);
+                    while(w3 === w1 || w3 === w2) w3 = generateNonMultiple(base);
+                    opts =[{val:correct, isCorrect:true, type:'text'}, {val:w1, isCorrect:false, type:'text'}, {val:w2, isCorrect:false, type:'text'}, {val:w3, isCorrect:false, type:'text'}];
                 } else if (type === 'angle') {
-                    // 幾何角度 (保持原有的)
                     let subType = Math.floor(Math.random()*3); 
                     qID = `sur_ang_${subType}`;
-                    const acutes = [30, 45, 60, 75, 80];
-                    const obtuses = [100, 120, 135, 150, 160];
+                    const acutes =[30, 45, 60, 75, 80];
+                    const obtuses =[100, 120, 135, 150, 160];
                     const rights = [90];
                     let correct, w1, w2, w3;
                     if(subType === 0) { 
@@ -520,13 +478,32 @@
                         let pool = [...rights, ...acutes]; pool.sort(() => Math.random() - 0.5);
                         [w1, w2, w3] = pool.slice(0, 3);
                     }
-                    opts = [{val:correct, isCorrect:true, type:'angle'}, {val:w1, isCorrect:false, type:'angle'}, {val:w2, isCorrect:false, type:'angle'}, {val:w3, isCorrect:false, type:'angle'}];
+                    opts =[{val:correct, isCorrect:true, type:'angle'}, {val:w1, isCorrect:false, type:'angle'}, {val:w2, isCorrect:false, type:'angle'}, {val:w3, isCorrect:false, type:'angle'}];
+                } else if (type === 'time') {
+                    let h = Math.floor(Math.random()*12)+1;
+                    let m = (Math.floor(Math.random()*4)*15); 
+                    qID = `sur_time_${h}_${m}`;
+                    qStr = `哪個時鐘是 ${h}:${m===0?'00':m} ?`;
+                    let correctTime = {h:h, m:m};
+                    let wrongTimes =[];
+                    while(wrongTimes.length < 3) {
+                        let wh = Math.floor(Math.random()*12)+1;
+                        let wm = (Math.floor(Math.random()*4)*15);
+                        if(wh===h && wm===m) continue;
+                        let dup = false; for(let wt of wrongTimes) if(wt.h===wh && wt.m===wm) dup=true;
+                        if(!dup) wrongTimes.push({h:wh, m:wm});
+                    }
+                    opts =[{val:correctTime, isCorrect:true, type:'time'}, {val:wrongTimes[0], isCorrect:false, type:'time'}, {val:wrongTimes[1], isCorrect:false, type:'time'}, {val:wrongTimes[2], isCorrect:false, type:'time'}];
                 }
             } while (questionHistory.has(qID) && attempts < 5);
             questionHistory.add(qID);
             ui.qText.innerText = qStr;
             spawnZones(opts);
             startSurvivalCountdown();
+        }
+
+        function generateNonMultiple(base) {
+            let r; do { r = Math.floor(Math.random()*30)+1; } while (r % base === 0 || r === 0); return r;
         }
 
         function startSurvivalCountdown() {
@@ -537,11 +514,11 @@
         }
 
         function spawnBalls(ans) {
-            targets = [];
+            targets =[];
             let vals = [ans];
             while(vals.length < 5) {
-                let r = ans + Math.floor(Math.random()*10) - 5;
-                if(r !== ans && !vals.includes(r)) vals.push(r);
+                let r = ans + Math.floor(Math.random()*14) - 7;
+                if(r !== ans && r > 0 && !vals.includes(r)) vals.push(r);
             }
             vals.sort(()=>Math.random()-0.5);
             vals.forEach(v => {
@@ -550,16 +527,16 @@
         }
 
         function spawnZones(options) {
-            targets = []; options.sort(()=>Math.random()-0.5);
+            targets =[]; options.sort(()=>Math.random()-0.5);
             const w = canvas.width, h = canvas.height;
-            const pos = [{x: w*0.25, y: h*0.35}, {x: w*0.75, y: h*0.35}, {x: w*0.25, y: h*0.75}, {x: w*0.75, y: h*0.75}];
+            const pos =[{x: w*0.25, y: h*0.35}, {x: w*0.75, y: h*0.35}, {x: w*0.25, y: h*0.75}, {x: w*0.75, y: h*0.75}];
             options.forEach((opt, i) => {
                 if(i < 4) targets.push({ type: 'zone', x: pos[i].x, y: pos[i].y, r: 120, maxR: 120, val: opt.val, isCorrect: opt.isCorrect, drawType: opt.type });
             });
         }
 
         function updatePhysics() {
-            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() :[];
             if(gameState === 'playing' || gameState === 'start') updateGamepadStatus();
 
             const deadzone = 0.2;
@@ -573,7 +550,7 @@
                 if (Math.abs(gamepads[0].axes[0]) > deadzone) p1ax = gamepads[0].axes[0];
                 if (Math.abs(gamepads[0].axes[1]) > deadzone) p1ay = gamepads[0].axes[1];
             }
-            players.p1.vx += p1ax * 0.75; // 速度減慢
+            players.p1.vx += p1ax * 0.75; // 速度減慢 1/4 (0.75)
             players.p1.vy += p1ay * 0.75;
 
             let p2ax = 0, p2ay = 0;
@@ -616,8 +593,7 @@
             else updateSurvivalLogic();
         }
 
-        function updateBumperLogic() {
-            [players.p1, players.p2].forEach(p => {
+        function updateBumperLogic() {[players.p1, players.p2].forEach(p => {
                 for(let i=targets.length-1; i>=0; i--) {
                     let t = targets[i];
                     if(t.type !== 'ball') continue;
@@ -640,7 +616,7 @@
                             spawnFloatText(t.x, t.y, "-1", '#ff0000');
                             shakeScreen(5);
                             updateScoreUI();
-                            // 錯球反彈力度 0.1
+                            // 錯球反彈力度減慢 (0.1)
                             t.vx = (t.x-p.x)*0.1; t.vy = (t.y-p.y)*0.1; 
                         }
                     }
@@ -668,8 +644,7 @@
         }
 
         function checkSurvivalResult() {
-            let anyCorrect = false;
-            [players.p1, players.p2].forEach(p => {
+            let anyCorrect = false;[players.p1, players.p2].forEach(p => {
                 let safe = false;
                 targets.forEach(t => {
                     if (t.isCorrect && Math.hypot(p.x-t.x, p.y-t.y) < t.r) safe = true;
@@ -682,7 +657,7 @@
                 } else {
                     p.score = Math.max(0, p.score - 1); 
                     spawnFloatText(p.x, p.y, "Miss", "#aaa");
-                    // 生存模式錯位彈飛力度 15
+                    // 生存模式錯位彈飛力度
                     p.vx = (Math.random()-0.5)*15; p.vy = (Math.random()-0.5)*15; 
                 }
             });
@@ -780,6 +755,18 @@
                 }
                 ctx.stroke();
                 ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+            } else if (t.drawType === 'time') {
+                let s = scale, r = 40 * s;
+                ctx.beginPath(); ctx.arc(t.x, t.y, r, 0, Math.PI*2); ctx.strokeStyle = '#fff'; ctx.lineWidth=2; ctx.stroke();
+                for(let i=0; i<4; i++) {
+                    let ang = i * Math.PI/2;
+                    ctx.beginPath(); ctx.moveTo(t.x + Math.cos(ang)*(r-5), t.y + Math.sin(ang)*(r-5)); ctx.lineTo(t.x + Math.cos(ang)*r, t.y + Math.sin(ang)*r); ctx.stroke();
+                }
+                let h = t.val.h, m = t.val.m;
+                let hAng = ((h % 12) + m/60) * 30 * Math.PI/180 - Math.PI/2;
+                let mAng = m * 6 * Math.PI/180 - Math.PI/2;
+                ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(t.x, t.y); ctx.lineTo(t.x + Math.cos(hAng)*(r*0.5), t.y + Math.sin(hAng)*(r*0.5)); ctx.stroke();
+                ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(t.x, t.y); ctx.lineTo(t.x + Math.cos(mAng)*(r*0.8), t.y + Math.sin(mAng)*(r*0.8)); ctx.stroke();
             }
         }
 
@@ -801,7 +788,7 @@
             setTimeout(() => document.getElementById('winner-name').focus(), 100);
         }
 
-        const LB_KEY = 'school_30th_lb_v4'; // 更新 Key
+        const LB_KEY = 'school_30th_lb_v5'; // 更新 Key
         function submitScore() {
             let name = ui.winnerInput.value.toUpperCase() || "AAA";
             let lb = JSON.parse(localStorage.getItem(LB_KEY) || "[]");
